@@ -72,13 +72,13 @@ stateDiagram-v2
     [*] --> Active
     Active --> Reported : User reports
     Reported --> UnderReview : Mod opens
-    
+
     UnderReview --> Active : Dismissed
     UnderReview --> Hidden : Action: Hide
     UnderReview --> Deleted : Action: Delete
-    
+
     Hidden --> Active : Restore
-    
+
     Active --> [*]
     Hidden --> [*]
     Deleted --> [*]
