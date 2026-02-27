@@ -70,15 +70,15 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> Active
-    Active --> Reported : User reports
-    Reported --> UnderReview : Mod opens
-
+    Active --> Reported : User_reports
+    Reported --> UnderReview : Mod_opens
+    
     UnderReview --> Active : Dismissed
-    UnderReview --> Hidden : Action: Hide
-    UnderReview --> Deleted : Action: Delete
-
+    UnderReview --> Hidden : Action_Hide
+    UnderReview --> Deleted : Action_Delete
+    
     Hidden --> Active : Restore
-
+    
     Active --> [*]
     Hidden --> [*]
     Deleted --> [*]
