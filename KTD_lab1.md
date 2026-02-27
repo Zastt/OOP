@@ -36,10 +36,10 @@ graph TD
     MSG_DB
     Rep_DB
     end
-
+```
 🔁 Частина 2 — Sequence Diagram
 Сценарій: Користувач А надсилає скаргу на повідомлення. Модератор отримує сповіщення, перевіряє контент і приховує його.
-
+```mermaid
 sequenceDiagram
     participant A as User A (Reporter)
     participant API as Backend API
@@ -64,28 +64,28 @@ sequenceDiagram
     Mod->>DB: updateReport(status: RESOLVED)
     
     Note right of MSG: Message is now filtered <br/>out from user feeds
-
+```
 🔄 Частина 3 — State Diagram
 Опис життєвого циклу повідомлення в контексті модерації. Повідомлення може бути активним, під перевіркою або прихованим/видаленим.
-
+```mermaid
 stateDiagram-v2
-    [*] --> Active : Message Sent
+    [*] --> Active
+    Active --> Reported : User reports
+    Reported --> UnderReview : Mod opens
     
-    Active --> Reported : User submits report
-    Reported --> UnderReview : Moderator opens report
+    UnderReview --> Active : Dismissed
+    UnderReview --> Hidden : Action: Hide
+    UnderReview --> Deleted : Action: Delete
     
-    UnderReview --> Active : Dismissed (No violation)
-    UnderReview --> Hidden : Action: Hide Content
-    UnderReview --> Deleted : Action: Hard Delete
-    
-    Hidden --> Active : Restored (on Appeal)
+    Hidden --> Active : Restore
     
     Active --> [*]
     Hidden --> [*]
     Deleted --> [*]
-
+```
 📚 Частина 4 — Architecture Decision Record (ADR)
 ADR-010: Використання "Soft Delete" та статусів видимості для модерації
+```markdown
 Status
 Accepted
 
@@ -111,3 +111,4 @@ Consequences
 Навантаження на сховище: "Видалені" повідомлення продовжують займати місце в основній базі.
 
 Продуктивність: Кожен запит на читання має фільтрувати статус (потрібен індекс на visibility_status).
+```
