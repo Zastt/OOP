@@ -1,0 +1,171 @@
+import re
+import json
+
+# ---------- Базові сутності ----------
+
+class Person:
+    def __init__(self, first_name, last_name, gender):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.gender = gender  # 'M' або 'F'
+
+    def __str__(self):
+        return f"{self.last_name} {self.first_name} ({self.gender})"
+
+
+class Student(Person):
+    def __init__(self, first_name, last_name, gender, course, student_id, average_grade, record_book):
+        super().__init__(first_name, last_name, gender)
+        self.course = course
+        self.student_id = student_id
+        self.average_grade = average_grade
+        self.record_book = record_book
+
+    def study(self):
+        print(f"{self.first_name} {self.last_name} навчається на {self.course}-му курсі.")
+
+    def to_dict(self):
+        return {
+            "firstname": self.first_name,
+            "lastname": self.last_name,
+            "gender": self.gender,
+            "course": self.course,
+            "student_id": self.student_id,
+            "average_grade": self.average_grade,
+            "record_book": self.record_book
+        }
+
+
+    def from_dict(data):
+        return Student(
+            data["firstname"], data["lastname"], data["gender"],
+            int(data["course"]), data["student_id"],
+            float(data["average_grade"]), data["record_book"]
+        )
+
+
+class Doctor(Person):
+    def heal(self):
+        print(f"Доктор {self.first_name} лікує пацієнтів.")
+
+    def invent_stories(self):
+        print(f"Доктор {self.first_name} придумує історії.")
+
+
+class Mechanic(Person):
+    def repair(self):
+        print(f"Механік {self.first_name} ремонтує авто.")
+
+    def invent_stories(self):
+        print(f"Механік {self.first_name} вигадує історії про машини.")
+
+
+# ---------- Клас для роботи з файлами ----------
+
+class FileManager:
+    def __init__(self, filename):
+        self.filename = filename
+
+    def save_students(self, students):
+        with open(self.filename, "w", encoding="utf-8") as f:
+            for st in students:
+                f.write(f"Student {st.first_name}{st.last_name}\n")
+                f.write(json.dumps(st.to_dict(), ensure_ascii=False))
+                f.write(";\n")
+
+    def load_students(self):
+        students = []
+        with open(self.filename, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        for i in range(0, len(lines), 2):
+            data = json.loads(lines[i + 1].replace(";", "").strip())
+            students.append(Student.from_dict(data))
+        return students
+
+
+# ---------- Валідація введення ----------
+
+def validate_student_id(student_id):
+    return re.match(r"^[A-Z]{2}\d{6}$", student_id) is not None
+
+def validate_record_book(record_book):
+    return re.match(r"^\d{8}$", record_book) is not None
+
+
+# ---------- Меню програми ----------
+
+class ConsoleMenu:
+    def __init__(self):
+        self.file_manager = FileManager("students.txt")
+        self.students = []
+
+    def input_students(self):
+        n = int(input("Скільки студентів ввести? "))
+        for _ in range(n):
+            print("\nВведіть дані студента:")
+            first_name = input("Ім'я: ")
+            last_name = input("Прізвище: ")
+            gender = input("Стать (M/F): ").upper()
+            course = int(input("Курс: "))
+            student_id = input("Студентський квиток (формат AB123456): ")
+            while not validate_student_id(student_id):
+                print(" Невірний формат. Спробуйте ще раз.")
+                student_id = input("Студентський квиток (AB123456): ")
+
+            average_grade = float(input("Середній бал (0–100): "))
+            record_book = input("Номер залікової книжки (8 цифр): ")
+            while not validate_record_book(record_book):
+                print(" Невірний формат. Спробуйте ще раз.")
+                record_book = input("Номер залікової книжки (8 цифр): ")
+
+            self.students.append(Student(first_name, last_name, gender, course, student_id, average_grade, record_book))
+
+        self.file_manager.save_students(self.students)
+        print("\n Дані збережено у файл.")
+
+    def load_from_file(self):
+        self.students = self.file_manager.load_students()
+        print(f" Завантажено {len(self.students)} студентів з файлу.")
+
+    def show_students(self):
+        if not self.students:
+            print("Немає даних.")
+            return
+        print("\nСписок студентів:")
+        for s in self.students:
+            print(s)
+
+    def count_excellent_male_students(self):
+        count = sum(1 for s in self.students if s.gender == "M" and s.course == 2 and s.average_grade >= 90)
+        print(f"\n Кількість студентів-чоловіків 2-го курсу з відмінним середнім балом: {count}")
+
+    def run(self):
+        while True:
+            print("\n===== МЕНЮ =====")
+            print("1. Ввести студентів і зберегти у файл")
+            print("2. Завантажити студентів з файлу")
+            print("3. Показати всіх студентів")
+            print("4. Порахувати відмінників-чоловіків 2 курсу")
+            print("0. Вихід")
+
+            choice = input("Ваш вибір: ")
+            if choice == "1":
+                self.input_students()
+            elif choice == "2":
+                self.load_from_file()
+            elif choice == "3":
+                self.show_students()
+            elif choice == "4":
+                self.count_excellent_male_students()
+            elif choice == "0":
+                print(" Завершення роботи.")
+                break
+            else:
+                print(" Невірний вибір.")
+
+
+# ---------- Запуск програми ----------
+
+if __name__ == "__main__":
+    menu = ConsoleMenu()
+    menu.run()

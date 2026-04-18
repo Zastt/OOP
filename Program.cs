@@ -16,7 +16,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ОДРУКІВКА БУЛА ТУТ: тепер тут правильно стоїть Build()
 var app = builder.Build(); 
 
 // Автоматичне створення бази даних при запуску
