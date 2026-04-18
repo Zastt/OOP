@@ -1,0 +1,218 @@
+from datetime import datetime, timedelta, time
+from encodings.hex_codec import hex_decode
+from typing import TypeVar, Generic, Optional, Iterator, List
+
+T = TypeVar('T')
+
+
+# ---------- Клас Flight (Рейс) ----------
+
+class Flight:
+
+    def __init__(self, number: str, date: str, departure: str, arrival: str,
+                 departure_time: str, arrival_time: str):
+        self.number = number
+        self.date = datetime.strptime(date, "%d.%m.%Y").date()
+        self.departure = departure
+        self.arrival = arrival
+        self.departure_time = datetime.strptime(departure_time, "%H:%M").time()
+        self.arrival_time = datetime.strptime(arrival_time, "%H:%M").time()
+
+    def get_duration(self) -> timedelta:
+        """Обчислює тривалість рейсу."""
+        dep_dt = datetime.combine(self.date, self.departure_time)
+        arr_dt = datetime.combine(self.date, self.arrival_time)
+        if arr_dt < dep_dt:
+            arr_dt += timedelta(days=1)
+        return arr_dt - dep_dt
+
+    def time_since_arrival(self) -> timedelta:
+        """Обчислює час, що минув після закінчення рейсу."""
+        arr_dt = datetime.combine(self.date, self.arrival_time)
+        now = datetime.now()
+        return now - arr_dt
+
+    def show_info(self):
+        """Виводить інформацію про рейс."""
+        print(f"Рейс №{self.number}: {self.departure} → {self.arrival}, "
+              f"дата {self.date.strftime('%d.%m.%Y')}, "
+              f"час {self.departure_time.strftime('%H:%M')} – {self.arrival_time.strftime('%H:%M')}")
+
+    def __lt__(self, other):
+        """Порівняння за номером рейсу для дерева."""
+        return self.number < other.number
+
+    def __eq__(self, other):
+        return self.number == other.number
+
+    def __str__(self):
+        return f"{self.number}: {self.departure} → {self.arrival}"
+
+
+# ---------- Узагальнене бінарне дерево ----------
+
+class Node(Generic[T]):
+    def __init__(self, value: T):
+        self.value: T = value
+        self.left: Optional['Node[T]'] = None
+        self.right: Optional['Node[T]'] = None
+
+
+class BinaryTree(Generic[T]):
+    #Узагальнене бінарне дерево з inorder-обходом.
+
+    def __init__(self):
+        self.root: Optional[Node[T]] = None
+
+    def insert(self, value: T):
+        """Додає елемент у дерево."""
+        if self.root is None:
+            self.root = Node(value)
+        else:
+            self._insert_recursive(self.root, value)
+
+    def _insert_recursive(self, node: Node[T], value: T):
+        if value < node.value:
+            if node.left is None:
+                node.left = Node(value)
+            else:
+                self._insert_recursive(node.left, value)
+        else:
+            if node.right is None:
+                node.right = Node(value)
+            else:
+                self._insert_recursive(node.right, value)
+
+    def inorder(self) ->  Iterator[T] :
+        #Центрований (inorder) обхід дерева
+        yield from self._inorder_recursive(self.root)
+
+    def _inorder_recursive(self, node: Optional[Node[T]]) -> Iterator[T]:
+        if node is not None:
+            yield from self._inorder_recursive (node.left)
+            yield node.value
+            yield from self._inorder_recursive(node.right)
+
+
+# ---------- Меню програми ----------
+
+class ConsoleMenu:
+    #Меню керування лабораторною.
+
+    def __init__(self):
+        self.flights: List[Flight] = []
+        self.tree = BinaryTree[Flight]()
+        self.load_default_flights()
+
+    def load_default_flights(self):
+        #Попередньо задані 5 рейсів.
+        self.flights = [
+            Flight("PS101", "05.11.2025", "Київ", "Львів", "08:30", "09:50"),
+            Flight("PS205", "05.11.2025", "Одеса", "Київ", "10:00", "11:10"),
+            Flight("PS307", "05.11.2025", "Харків", "Одеса", "12:15", "13:50"),
+            Flight("PS412", "05.11.2025", "Львів", "Харків", "15:00", "17:30"),
+            Flight("PS509", "05.11.2025", "Київ", "Дніпро", "19:00", "20:15")
+        ]
+        print("  Автоматично додано 5 рейсів.\n")
+
+    def input_flights(self):
+        """Ручне введення нових рейсів."""
+        n = int(input("Скільки рейсів додати? "))
+        for i in range(n):
+            print(f"\nВведення рейсу №{i + 1}:")
+            number = input("Номер рейсу: ")
+            date = input("Дата (дд.мм.рррр): ")
+            departure = input("Пункт відправлення: ")
+            arrival = input("Пункт прибуття: ")
+            dep_time = input("Час відправлення (год:хв): ")
+            arr_time = input("Час прибуття (год:хв): ")
+            self.flights.append(Flight(number, date, departure, arrival, dep_time, arr_time))
+        print("\n Нові рейси успішно додано!")
+
+    def show_all(self):
+        """Виводить усі рейси."""
+        if not self.flights:
+            print("❌ Список рейсів порожній.")
+            return
+        print("\n Усі рейси:")
+        for f in self.flights:
+            f.show_info()
+
+    def calculate_durations(self):
+        """Обчислення тривалості кожного рейсу."""
+        if not self.flights:
+            print(" Немає рейсів для обчислення.")
+            return
+        print("\n Тривалість рейсів:")
+        for f in self.flights:
+            print(f"Рейс {f.number}: {f.get_duration()}")
+
+    def calculate_time_since_arrival(self): 
+        #"""Обчислення часу, що минув після прибуття."""
+        if not self.flights:
+            print(" Немає рейсів для обчислення.")
+            return
+        print("\n Час після прибуття:")
+        for f in self.flights:
+            delta = f.time_since_arrival()
+            if delta.total_seconds() < 0:
+                print(f"Рейс {f.number}: ще не прибув.")
+            else:
+                print(f"Рейс {f.number}: минуло {delta}")
+
+    def build_tree(self):
+        """Побудова дерева з рейсів."""
+        if not self.flights:
+            print(" Немає рейсів для побудови дерева.")
+            return
+        self.tree = BinaryTree[Flight]()
+        for f in self.flights:
+            self.tree.insert(f)
+        print(" Бінарне дерево рейсів побудовано.")
+
+    def show_tree_inorder(self):
+        """Виведення рейсів з дерева (inorder-обхід)."""
+        if not self.tree.root:
+            print(" Дерево порожнє. Побудуйте його спочатку.")
+            return
+        print("\n Рейси в порядку inorder:")
+        for f in self.tree.inorder():
+            f.show_info()
+
+    def run(self):
+#        """Основний цикл меню."""
+        while True:
+            print("\n===== МЕНЮ =====")
+            print("1. Ввести нові рейси вручну")
+            print("2. Показати всі рейси")
+            print("3. Обчислити тривалість рейсів")
+            print("4. Обчислити час після прибуття")
+            print("5. Побудувати бінарне дерево")
+            print("6. Показати дерево (inorder)")
+            print("0. Вихід")
+
+            choice = input("Ваш вибір: ").strip()
+            if choice == "1":
+                self.input_flights()
+            elif choice == "2":
+                self.show_all()
+            elif choice == "3":
+                self.calculate_durations()
+            elif choice == "4":
+                self.calculate_time_since_arrival()
+            elif choice == "5":
+                self.build_tree()
+            elif choice == "6":
+                self.show_tree_inorder()
+            elif choice == "0":
+                print(" Завершення роботи.")
+                break
+            else:
+                print(" Невірний вибір. Спробуйте ще раз.")
+
+
+
+
+if __name__ == "__main__":
+    menu = ConsoleMenu()
+    menu.run()

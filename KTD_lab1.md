@@ -1,0 +1,114 @@
+# 🧪 Laboratory Work 1: Messaging System Design
+**Варіант 10: Moderation & Reporting** **Виконав:** Яценко Микола Васильович  
+**Група:** Б-121-24-3 ПІ  
+
+---
+
+## 🎯 Мета роботи
+- Проектування архітектури системи повідомлень перед початком розробки.
+- Розподіл відповідальності між компонентами.
+- Використання діаграм Component, Sequence та State для візуалізації логіки.
+- Документування архітектурних рішень (ADR).
+
+---
+
+## 🧠 Контекст
+Проектування месенджера з фокусом на **модерацію контенту**. Система дозволяє користувачам надсилати скарги на повідомлення, а модераторам — оперативно перевіряти їх та приховувати порушення.
+
+---
+
+## 🧱 Частина 1 — Component Diagram
+Ця діаграма відображає структуру системи. Ми виділяємо окремий сервіс модерації, щоб не перевантажувати основний сервіс повідомлень адміністративною логікою.
+
+```mermaid
+graph TD
+    Client[User Client] -->|1. Report Message| API[Backend API Gateway]
+    API --> MS[Message Service]
+    API --> ModService[Moderation Service]
+    
+    MS --> MSG_DB[(Messages DB)]
+    ModService --> Rep_DB[(Reports & Audit DB)]
+    
+    AdminPanel[Moderator Dashboard] -->|2. Review & Action| ModService
+    ModService -.->|3. Update Visibility| MS
+    
+    subgraph Storage Layer
+    MSG_DB
+    Rep_DB
+    end
+```
+🔁 Частина 2 — Sequence Diagram
+Сценарій: Користувач А надсилає скаргу на повідомлення. Модератор отримує сповіщення, перевіряє контент і приховує його.
+```mermaid
+sequenceDiagram
+    participant A as User A (Reporter)
+    participant API as Backend API
+    participant Mod as Moderation Service
+    participant DB as Reports DB
+    participant M as Moderator (Admin Panel)
+    participant MSG as Message Service
+
+    A->>API: POST /messages/{id}/report (Reason)
+    API->>Mod: createReport(message_id, user_id, reason)
+    Mod->>DB: saveReport(status: PENDING)
+    Mod-->>API: 202 Accepted
+    API-->>A: Thank you for your report
+
+    Note over M, Mod: Moderator logs into Dashboard
+    
+    M->>Mod: GET /pending-reports
+    Mod-->>M: List of reports
+    
+    M->>Mod: POST /action (HIDDEN, message_id)
+    Mod->>MSG: updateMessageStatus(id, HIDDEN)
+    Mod->>DB: updateReport(status: RESOLVED)
+    
+    Note right of MSG: Message is now filtered <br/>out from user feeds
+```
+🔄 Частина 3 — State Diagram
+Опис життєвого циклу повідомлення в контексті модерації. Повідомлення може бути активним, під перевіркою або прихованим/видаленим.
+```mermaid
+stateDiagram-v2
+    [*] --> Active
+    Active --> Reported : User_reports
+    Reported --> UnderReview : Mod_opens
+    
+    UnderReview --> Active : Dismissed
+    UnderReview --> Hidden : Action_Hide
+    UnderReview --> Deleted : Action_Delete
+    
+    Hidden --> Active : Restore
+    
+    Active --> [*]
+    Hidden --> [*]
+    Deleted --> [*]
+```
+📚 Частина 4 — Architecture Decision Record (ADR)
+ADR-010: Використання "Soft Delete" та статусів видимості для модерації
+```markdown
+Status
+Accepted
+
+Context
+Коли модератор вирішує, що повідомлення порушує правила спільноти, нам потрібно вибрати: видаляти дані фізично чи просто приховувати їх. Система повинна підтримувати прозорість, можливість апеляцій та зберігати історію дій модераторів.
+
+Decision
+Впровадити механізм Soft Delete (м'яке видалення) через поле visibility_status у базі даних повідомлень.
+
+Повідомлення, позначені модератором, отримують статус HIDDEN_BY_MODERATOR.
+
+Сервіс повідомлень (Message Service) автоматично фільтрує повідомлення, де статус не є ACTIVE, для звичайних запитів користувачів.
+
+Окремий Audit Log ведеться в Moderation Service для запису того, який модератор виконав дію та з якої причини.
+
+Consequences
+Висока цілісність даних: Контент залишається доступним для апеляцій або запитів правоохоронних органів.
+
+Можливість скасування: Модератори можуть легко повернути повідомлення, якщо сталася помилка.
+
+Підзвітність: Кожна адміністративна дія зафіксована.
+
+Навантаження на сховище: "Видалені" повідомлення продовжують займати місце в основній базі.
+
+Продуктивність: Кожен запит на читання має фільтрувати статус (потрібен індекс на visibility_status).
+```
